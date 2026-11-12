@@ -1,0 +1,9 @@
+{
+  "name": "respuestas-ia",
+  "version": "1.0.0",
+  "description": "Genera respuestas simuladas con IA a formularios de Google Forms o Microsoft Forms y las exporta a Excel",
+  "type": "module",
+  "private": true,
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=18" }
+}

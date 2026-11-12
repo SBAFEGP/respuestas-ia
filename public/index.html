@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Respuestas simuladas con IA para formularios</title>
+<meta name="description" content="Genera respuestas simuladas con IA a formularios de Google Forms o Microsoft Forms según un público objetivo y expórtalas a Excel.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='6' width='52' height='52' rx='12' fill='%231f4e5f'/%3E%3Crect x='17' y='18' width='30' height='5' rx='2.5' fill='%23fff'/%3E%3Crect x='17' y='30' width='22' height='5' rx='2.5' fill='%23fff'/%3E%3Ccircle cx='44' cy='43' r='7' fill='%23e8a33d'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+<style>
+:root{
+  --bg:#f3efe6; --ink:#1d2a33; --muted:#5f6b75; --card:#fff; --line:#e3ddd0; --soft:#f7f4ee;
+  --brand:#1f4e5f; --brand-2:#2c6e80; --accent:#e8a33d; --ok:#2e7d4f; --warn:#a86b00; --err:#a3271d;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+a{color:var(--brand-2)}
+
+.top{background:var(--brand);color:#fff;padding:1rem 1.25rem}
+.top-in{max-width:1100px;margin:0 auto;display:flex;gap:.8rem;align-items:center}
+.top h1{margin:0;font-size:1.25rem;letter-spacing:.01em}
+.top p{margin:.15rem 0 0;font-size:.9rem;opacity:.85}
+
+main{max-width:1100px;margin:0 auto;padding:1rem;display:flex;flex-direction:column;gap:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:1.1rem 1.2rem}
+.card>h2{display:flex;align-items:center;gap:.6rem;margin:0 0 .9rem;font-size:1.08rem}
+.step{display:inline-grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:var(--brand);color:#fff;font-size:.9rem;font-weight:700;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem 1.3rem}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+@media (max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+label.lbl{display:block;font-weight:600;font-size:.9rem;margin-bottom:.3rem}
+.hint{font-size:.82rem;color:var(--muted);margin:.35rem 0 0}
+input[type=text],input[type=url],input[type=number],input[type=password],select,textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:.55rem .65rem;background:#fff}
+textarea{resize:vertical;min-height:4.5rem}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.row>input{flex:1 1 260px;width:auto}
+.btn{border:1px solid var(--line);background:#fff;padding:.55rem .9rem;border-radius:9px;font-size:.92rem;font-weight:600}
+.btn:hover{border-color:var(--brand-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-2)}
+.btn.accent{background:var(--accent);border-color:#c98a26;color:#2a1a00}
+.btn.small{padding:.3rem .6rem;font-size:.82rem;font-weight:600}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.tab:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.check{display:flex;gap:.5rem;align-items:flex-start;font-size:.9rem}
+.check input{margin-top:.25rem;accent-color:var(--brand-2)}
+
+.tabs{display:inline-flex;background:#f1ede4;border-radius:10px;padding:4px;gap:4px;margin-bottom:.9rem}
+.tab{border:0;background:transparent;border-radius:7px;padding:.45rem 1rem;font-weight:600;color:var(--muted)}
+.tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;border:2px dashed var(--line);border-radius:12px;padding:1.4rem;text-align:center;background:var(--soft);cursor:pointer}
+.drop.over{border-color:var(--brand-2);background:#eef5f7}
+.drop input{display:none}
+
+.status{margin-top:.8rem;font-size:.9rem;padding:.6rem .8rem;border-radius:9px;background:var(--soft)}
+.status.ok{background:#e9f5ee;color:#1d5b37}
+.status.err{background:#fbecea;color:var(--err)}
+.status.busy{background:#eef5f7;color:var(--brand)}
+.spin{display:inline-block;width:.9em;height:.9em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-.12em;margin-right:.4rem}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.formhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
+.formhead h3{margin:0;font-size:1.05rem}
+.formhead p{margin:.2rem 0 0;color:var(--muted);font-size:.88rem}
+.qlist{list-style:none;padding:0;margin:.8rem 0 0;display:flex;flex-direction:column;gap:.45rem;max-height:30rem;overflow:auto}
+.q{display:grid;grid-template-columns:auto 1fr;gap:.6rem;align-items:start;border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;background:#fff}
+.q.off{background:var(--soft);opacity:.6}
+.q input{margin-top:.3rem;accent-color:var(--brand-2)}
+.q .t{font-weight:600;font-size:.93rem}
+.q .t .req{color:var(--err)}
+.q .meta{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem}
+.pill{font-size:.72rem;border-radius:999px;padding:.08rem .5rem;background:#eef2f4;color:#30515c;border:1px solid #d7e2e6}
+.pill.type{background:#fff4e0;color:#7a4e00;border-color:#f1d9a8;font-weight:700}
+.pill.sec{background:#f1ede4;color:var(--muted);border-color:var(--line)}
+details.adv{margin-top:.8rem}
+details.adv summary{cursor:pointer;font-size:.88rem;color:var(--brand-2);font-weight:600}
+details.adv textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;min-height:14rem;margin-top:.5rem}
+
+.fields{display:flex;flex-direction:column;gap:.6rem}
+.field{display:grid;grid-template-columns:minmax(120px,190px) 1fr auto;gap:.5rem;align-items:start;border:1px solid var(--line);border-radius:10px;padding:.6rem;background:var(--soft)}
+.field textarea{min-height:5.2rem;font-size:.88rem}
+@media (max-width:620px){.field{grid-template-columns:1fr}}
+.agebox{display:flex;gap:.5rem;align-items:center}
+.agebox input{width:5.5rem}
+
+.note{font-size:.84rem;background:#fff8e6;border:1px solid #f1d9a8;border-radius:10px;padding:.6rem .8rem;color:#5c4100;margin-top:.8rem}
+
+.gen{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.bar{height:12px;background:#ece7dc;border-radius:999px;overflow:hidden;margin-top:1rem}
+.bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand-2),var(--accent));transition:width .3s}
+.progress-txt{font-size:.9rem;margin-top:.45rem;font-variant-numeric:tabular-nums}
+.log{margin-top:.7rem;max-height:9rem;overflow:auto;font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#1d2a33;color:#d7e3ea;border-radius:10px;padding:.6rem .8rem;white-space:pre-wrap}
+.log .w{color:#ffd27a}.log .e{color:#ff9d92}.log .o{color:#9fe3b5}
+.tablewrap{margin-top:1rem;overflow:auto;max-height:28rem;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;font-size:.8rem;min-width:100%}
+th,td{border-bottom:1px solid #eee7da;padding:.4rem .55rem;text-align:left;vertical-align:top;max-width:22rem}
+th{position:sticky;top:0;background:var(--brand);color:#fff;font-weight:600;white-space:nowrap;max-width:none}
+td{white-space:pre-wrap}
+tr:nth-child(even) td{background:#fbf9f5}
+
+footer{max-width:1100px;margin:0 auto;padding:.5rem 1rem 1.5rem;color:var(--muted);font-size:.8rem;text-align:center}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <svg width="38" height="38" viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="12" fill="#fff" fill-opacity=".14" stroke="#fff" stroke-opacity=".5" stroke-width="2"/><rect x="17" y="18" width="30" height="5" rx="2.5" fill="#fff"/><rect x="17" y="30" width="22" height="5" rx="2.5" fill="#fff"/><circle cx="44" cy="43" r="7" fill="#e8a33d"/></svg>
+    <div>
+      <h1>Respuestas simuladas con IA para formularios</h1>
+      <p>Para pilotar cuestionarios, probar análisis o preparar prácticas. Cada respuesta la genera un «encuestado virtual» con su propio perfil.</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- PASO 1 -->
+  <section class="card" aria-labelledby="h1">
+    <h2 id="h1"><span class="step">1</span> Formulario</h2>
+    <div class="tabs" role="tablist" aria-label="Cómo introducir el formulario">
+      <button class="tab" role="tab" data-src="link" aria-selected="true">Enlace</button>
+      <button class="tab" role="tab" data-src="pdf" aria-selected="false">PDF</button>
+      <button class="tab" role="tab" data-src="text" aria-selected="false">Texto</button>
+    </div>
+    <div data-pane="link">
+      <div class="row">
+        <input type="url" id="formUrl" placeholder="https://forms.gle/…  ·  https://docs.google.com/forms/…  ·  https://forms.office.com/r/…" aria-label="Enlace del formulario">
+        <button class="btn primary" id="readLink">Leer formulario</button>
+      </div>
+      <p class="hint">Funciona con formularios públicos de Google Forms o Microsoft Forms (que se puedan abrir sin iniciar sesión). Si el formulario es solo para tu organización, usa la pestaña PDF.</p>
+    </div>
+    <div data-pane="pdf" hidden>
+      <label class="drop" id="drop">
+        <input type="file" id="pdfFile" accept="application/pdf,.pdf">
+        <strong>Arrastra aquí el PDF del formulario o pulsa para elegirlo</strong>
+        <span class="hint" style="margin:0">Google Forms: menú ⋮ → Imprimir → Guardar como PDF. Microsoft Forms: ··· → Imprimir formulario → Guardar como PDF.</span>
+      </label>
+      <p class="hint">El PDF se lee en tu navegador y la IA identifica las preguntas (necesita la clave del paso 3).</p>
+    </div>
+    <div data-pane="text" hidden>
+      <textarea id="formText" rows="8" placeholder="Pega aquí las preguntas con sus opciones de respuesta…"></textarea>
+      <div class="row" style="margin-top:.5rem"><button class="btn primary" id="readText">Analizar texto</button></div>
+      <p class="hint">La IA identificará el tipo de cada pregunta (necesita la clave del paso 3).</p>
+    </div>
+    <div id="formStatus" class="status" hidden></div>
+
+    <div id="formView" hidden>
+      <div class="formhead">
+        <div><h3 id="formTitle"></h3><p id="formDesc"></p></div>
+        <div class="row" style="flex:none">
+          <span class="hint" style="margin:0" id="qCount"></span>
+          <button class="btn small" id="qAll">Todas</button>
+          <button class="btn small" id="qNone">Ninguna</button>
+        </div>
+      </div>
+      <ol class="qlist" id="qList"></ol>
+      <details class="adv">
+        <summary>Revisar o corregir la estructura (JSON)</summary>
+        <textarea id="formJson" spellcheck="false" aria-label="Estructura del formulario en JSON"></textarea>
+        <div class="row" style="margin-top:.5rem"><button class="btn small" id="applyJson">Aplicar cambios</button>
+        <span class="hint" style="margin:0">Tipos: short, paragraph, single, dropdown, multiple, scale, rating, grid_single, grid_multiple, ranking, date, time, file.</span></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- PASO 2 -->
+  <section class="card" aria-labelledby="h2">
+    <h2 id="h2"><span class="step">2</span> Público objetivo y perfiles</h2>
+    <div class="grid2">
+      <div>
+        <label class="lbl" for="audience">Público objetivo</label>
+        <textarea id="audience" rows="4" placeholder="Ej.: Estudiantes de 1.º del Grado en Magisterio de una universidad pública española, la mayoría con poca experiencia docente."></textarea>
+      </div>
+      <div>
+        <label class="lbl" for="context">Contexto e instrucciones adicionales <span class="hint">(opcional)</span></label>
+        <textarea id="context" rows="4" placeholder="Ej.: La encuesta se pasa al final del primer cuatrimestre. En general están satisfechos, pero preocupados por la carga de trabajo."></textarea>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-top:1rem">
+      <div>
+        <label class="lbl" for="nResp">Número de respuestas</label>
+        <input type="number" id="nResp" min="1" max="1000" value="30">
+      </div>
+      <div>
+        <label class="lbl">Edad</label>
+        <div class="agebox">
+          <input type="number" id="ageMin" min="0" max="120" value="18" aria-label="Edad mínima"> –
+          <input type="number" id="ageMax" min="0" max="120" value="25" aria-label="Edad máxima">
+          <label class="check" style="margin:0"><input type="checkbox" id="useAge" checked> usar</label>
+        </div>
+      </div>
+      <div>
+        <label class="lbl" for="lang">Idioma de las respuestas abiertas</label>
+        <input type="text" id="lang" value="español">
+      </div>
+      <div>
+        <label class="lbl" for="variability">Diversidad de opiniones</label>
+        <select id="variability">
+          <option value="baja">Baja (respuestas parecidas)</option>
+          <option value="media" selected>Media (realista)</option>
+          <option value="alta">Alta (muy polarizadas)</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl" for="openLen">Respuestas abiertas</label>
+        <select id="openLen">
+          <option value="breves">Breves (como en encuestas reales)</option>
+          <option value="medias" selected>Medias</option>
+          <option value="detalladas">Detalladas</option>
+        </select>
+      </div>
+      <div style="align-self:end">
+        <label class="check"><input type="checkbox" id="profileCols" checked> <span>Añadir las columnas del perfil a la hoja de respuestas</span></label>
+      </div>
+    </div>
+
+    <div style="margin-top:1.1rem">
+      <label class="lbl">Campos del perfil (procedencia, género, estudios…)</label>
+      <p class="hint" style="margin-top:0">Escribe un valor por línea con su porcentaje o peso (<code>Zaragoza: 50</code>). Las respuestas se reparten con esas proporciones. Si dejas los valores vacíos, la IA los elige de forma coherente con el público objetivo.</p>
+      <div class="fields" id="fields" style="margin-top:.6rem"></div>
+      <button class="btn small" id="addField" style="margin-top:.6rem">+ Añadir campo</button>
+    </div>
+  </section>
+
+  <!-- PASO 3 -->
+  <section class="card" aria-labelledby="h3">
+    <h2 id="h3"><span class="step">3</span> Modelo de IA (gratuito)</h2>
+    <div class="grid3">
+      <div>
+        <label class="lbl" for="provider">Proveedor</label>
+        <select id="provider">
+          <option value="gemini">Google Gemini (nivel gratuito)</option>
+          <option value="openai">Compatible con OpenAI (Groq, OpenRouter…)</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl" for="model">Modelo</label>
+        <input type="text" id="model" list="modelList" value="gemini-3.8-flash">
+        <datalist id="modelList">
+          <option value="gemini-3.8-flash"></option>
+          <option value="gemini-3.6-flash"></option>
+          <option value="gemini-3.5-flash-lite"></option>
+          <option value="gemini-3.1-flash-lite"></option>
+        </datalist>
+      </div>
+      <div>
+        <label class="lbl" for="apiKey">Clave de API</label>
+        <input type="password" id="apiKey" autocomplete="off" placeholder="Pega tu clave">
+        <label class="check" style="margin-top:.35rem"><input type="checkbox" id="rememberKey"> <span>Recordarla en este navegador</span></label>
+      </div>
+      <div id="baseUrlBox" hidden style="grid-column:1/-1">
+        <label class="lbl" for="baseUrl">URL base de la API</label>
+        <input type="url" id="baseUrl" value="https://api.groq.com/openai/v1">
+      </div>
+    </div>
+    <p class="hint" id="keyHelp">Consigue una clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> (botón «Create API key»). La clave solo se usa desde tu navegador; no pasa por el servidor de esta aplicación.</p>
+    <details class="adv">
+      <summary>Ajustes de velocidad</summary>
+      <div class="grid3" style="margin-top:.6rem">
+        <div><label class="lbl" for="batch">Encuestados por petición</label><input type="number" id="batch" min="1" max="20" value="8"></div>
+        <div><label class="lbl" for="pause">Pausa entre peticiones (s)</label><input type="number" id="pause" min="0" max="120" value="4"></div>
+      </div>
+      <p class="hint">Si aparecen avisos de límite de peticiones, sube la pausa o cambia a un modelo «flash-lite», que suele tener más cuota gratuita.</p>
+    </details>
+    <div class="note">En el nivel gratuito, Google puede usar el contenido enviado para mejorar sus productos. No incluyas datos personales reales en el formulario ni en las instrucciones.</div>
+  </section>
+
+  <!-- PASO 4 -->
+  <section class="card" aria-labelledby="h4">
+    <h2 id="h4"><span class="step">4</span> Generar y descargar</h2>
+    <div class="gen">
+      <button class="btn accent" id="genBtn">Generar respuestas</button>
+      <button class="btn" id="stopBtn" hidden>Detener</button>
+      <button class="btn primary" id="xlsxBtn" disabled>Descargar Excel</button>
+      <button class="btn ghost small" id="clearBtn" hidden>Borrar resultados</button>
+    </div>
+    <div id="progressBox" hidden>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="progress-txt" id="progressTxt"></div>
+      <div class="log" id="log" aria-live="polite"></div>
+    </div>
+    <div class="tablewrap" id="previewWrap" hidden><table id="preview"></table></div>
+  </section>
+</main>
+
+<footer>Las respuestas son sintéticas: el Excel lo indica en la hoja «Información». No envía nada al formulario original. Los ajustes se guardan solo en este navegador.</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* ====================== Utilidades ====================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const SKEY = 'respuestasIA.v1';
+const store = {
+  get(){ try { return JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch { return {}; } },
+  set(o){ try { localStorage.setItem(SKEY, JSON.stringify(o)); } catch {} }
+};
+function sleep(ms, signal){
+  return new Promise((res, rej) => {
+    const t = setTimeout(res, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); rej(new DOMException('Detenido', 'AbortError')); }, { once: true });
+  });
+}
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function randInt(a, b){ return a + Math.floor(Math.random() * (b - a + 1)); }
+
+const TYPE_LABEL = { short:'Respuesta corta', paragraph:'Párrafo', single:'Opción única', dropdown:'Desplegable', multiple:'Varias opciones',
+  scale:'Escala', rating:'Valoración', grid_single:'Cuadrícula', grid_multiple:'Cuadrícula (varias)', ranking:'Clasificación',
+  date:'Fecha', time:'Hora', file:'Archivo (se omite)' };
+const TYPES = Object.keys(TYPE_LABEL);
+
+/* ====================== Estado ====================== */
+const saved = store.get();
+const state = {
+  src: 'link',
+  form: saved.form || null,
+  fields: saved.fields || [
+    { name: 'Procedencia', values: '' },
+    { name: 'Género', values: 'Mujer: 50\nHombre: 47\nNo binario / prefiere no decirlo: 3' }
+  ],
+  results: [],
+  running: false,
+  ctrl: null
+};
+
+const settingIds = ['formUrl','audience','context','nResp','ageMin','ageMax','useAge','lang','variability','openLen','profileCols','provider','model','baseUrl','batch','pause','rememberKey'];
+function loadSettings(){
+  const s = saved.settings || {};
+  settingIds.forEach(id => {
+    if (s[id] === undefined) return;
+    const el = $('#' + id);
+    if (el.type === 'checkbox') el.checked = !!s[id]; else el.value = s[id];
+  });
+  if (s.rememberKey && saved.apiKey) $('#apiKey').value = saved.apiKey;
+}
+function persist(){
+  const settings = {};
+  settingIds.forEach(id => { const el = $('#' + id); settings[id] = el.type === 'checkbox' ? el.checked : el.value; });
+  store.set({ settings, fields: state.fields, form: state.form, apiKey: settings.rememberKey ? $('#apiKey').value : '' });
+}
+
+/* ====================== Paso 1: formulario ====================== */
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  state.src = t.dataset.src;
+  $$('.tab').forEach(x => x.setAttribute('aria-selected', String(x === t)));
+  $$('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== state.src; });
+}));
+
+function setStatus(msg, kind = ''){
+  const el = $('#formStatus');
+  el.hidden = !msg; el.className = 'status ' + kind;
+  el.innerHTML = kind === 'busy' ? '<span class="spin"></span>' + esc(msg) : esc(msg);
+}
+
+function normalizeQuestions(list){
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach(q => {
+    if (!q || typeof q !== 'object') return;
+    const title = String(q.title ?? q.pregunta ?? '').trim();
+    if (!title) return;
+    let type = String(q.type ?? q.tipo ?? 'short').trim();
+    if (!TYPES.includes(type)) type = Array.isArray(q.options) && q.options.length ? 'single' : 'short';
+    const strs = a => (Array.isArray(a) ? a : []).map(x => String(x ?? '').trim()).filter(Boolean);
+    const nq = { id: 'q' + (out.length + 1), title, description: String(q.description ?? '').trim(), type,
+      options: strs(q.options), other: !!q.other, required: !!q.required, section: String(q.section ?? '').trim(),
+      include: q.include !== undefined ? !!q.include : type !== 'file' };
+    if (type === 'scale' || type === 'rating'){
+      const s = q.scale || {};
+      let min = parseInt(s.min, 10), max = parseInt(s.max, 10);
+      if (!Number.isFinite(min)) min = type === 'rating' ? 1 : 1;
+      if (!Number.isFinite(max) || max <= min) max = Math.max(min + 1, 5);
+      nq.scale = { min, max, minLabel: String(s.minLabel ?? ''), maxLabel: String(s.maxLabel ?? '') };
+      nq.options = [];
+    }
+    if (type === 'grid_single' || type === 'grid_multiple'){
+      nq.rows = strs(q.rows); nq.columns = strs(q.columns);
+      if (!nq.rows.length || !nq.columns.length){ nq.type = 'paragraph'; delete nq.rows; delete nq.columns; }
+    }
+    if ((type === 'single' || type === 'dropdown' || type === 'multiple' || type === 'ranking') && !nq.options.length && !nq.other) nq.type = 'short';
+    out.push(nq);
+  });
+  return out;
+}
+
+function setForm(f){
+  const questions = normalizeQuestions(f.questions);
+  if (!questions.length) throw new Error('No se encontró ninguna pregunta.');
+  state.form = { title: String(f.title || 'Formulario').trim(), description: String(f.description || '').trim(), source: f.source || state.src, url: f.url || '', questions };
+  state.results = []; renderResults();
+  renderForm(); persist();
+}
+
+function qMeta(q){
+  const parts = [`<span class="pill type">${esc(TYPE_LABEL[q.type] || q.type)}</span>`];
+  if (q.section) parts.push(`<span class="pill sec">${esc(q.section)}</span>`);
+  if (q.scale) parts.push(`<span class="pill">${q.scale.min}–${q.scale.max}${q.scale.minLabel || q.scale.maxLabel ? ` (${esc(q.scale.minLabel)} … ${esc(q.scale.maxLabel)})` : ''}</span>`);
+  if (q.rows) parts.push(`<span class="pill">${q.rows.length} filas × ${q.columns.length} columnas</span>`);
+  const opts = q.options.slice(0, 8).map(o => `<span class="pill">${esc(o)}</span>`);
+  if (q.options.length > 8) opts.push(`<span class="pill">+${q.options.length - 8}</span>`);
+  if (q.other) opts.push('<span class="pill">Otra…</span>');
+  return parts.concat(opts).join('');
+}
+
+function renderForm(){
+  const f = state.form;
+  $('#formView').hidden = !f;
+  if (!f) return;
+  $('#formTitle').textContent = f.title;
+  $('#formDesc').textContent = f.description.slice(0, 300);
+  const inc = f.questions.filter(q => q.include).length;
+  $('#qCount').textContent = `${inc} de ${f.questions.length} preguntas incluidas`;
+  $('#qList').innerHTML = f.questions.map(q => `
+    <li class="q${q.include ? '' : ' off'}">
+      <input type="checkbox" data-q="${q.id}" ${q.include ? 'checked' : ''} ${q.type === 'file' ? 'disabled' : ''} aria-label="Incluir pregunta">
+      <div><div class="t">${esc(q.title)}${q.required ? ' <span class="req" title="Obligatoria">*</span>' : ''}</div>
+      ${q.description ? `<div class="hint" style="margin:.1rem 0 0">${esc(q.description.slice(0, 200))}</div>` : ''}
+      <div class="meta">${qMeta(q)}</div></div>
+    </li>`).join('');
+  $('#formJson').value = JSON.stringify({ title: f.title, description: f.description, questions: f.questions.map(({ id, include, ...rest }) => rest) }, null, 2);
+}
+
+$('#qList').addEventListener('change', e => {
+  const id = e.target.dataset.q; if (!id) return;
+  const q = state.form.questions.find(x => x.id === id); q.include = e.target.checked;
+  renderForm(); persist();
+});
+$('#qAll').addEventListener('click', () => { state.form.questions.forEach(q => { q.include = q.type !== 'file'; }); renderForm(); persist(); });
+$('#qNone').addEventListener('click', () => { state.form.questions.forEach(q => { q.include = false; }); renderForm(); persist(); });
+$('#applyJson').addEventListener('click', () => {
+  try {
+    const data = JSON.parse($('#formJson').value);
+    const keep = new Map(state.form.questions.map(q => [q.title, q.include]));
+    data.questions = (data.questions || []).map(q => ({ ...q, include: keep.has(q.title) ? keep.get(q.title) : undefined }));
+    setForm({ ...state.form, ...data });
+    setStatus('Estructura actualizada.', 'ok');
+  } catch (e) { setStatus('El JSON no es válido: ' + e.message, 'err'); }
+});
+
+// Enlace → servidor
+$('#readLink').addEventListener('click', async () => {
+  const url = $('#formUrl').value.trim();
+  if (!url){ setStatus('Pega primero el enlace del formulario.', 'err'); return; }
+  persist();
+  setStatus('Leyendo el formulario…', 'busy');
+  let data;
+  try {
+    const res = await fetch('/api/form', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    if (res.status === 404 && !(res.headers.get('content-type') || '').includes('json')) throw new Error('NOAPI');
+    data = await res.json();
+  } catch (e) {
+    setStatus(e.message === 'NOAPI' || location.protocol === 'file:'
+      ? 'La lectura por enlace necesita el servidor (Render o Netlify). Mientras tanto, usa las pestañas PDF o Texto.'
+      : 'No se pudo contactar con el servidor. Comprueba tu conexión o usa las pestañas PDF o Texto.', 'err');
+    return;
+  }
+  if (data.ok){
+    try { setForm(data.form); setStatus(`Formulario leído: ${state.form.questions.length} preguntas.`, 'ok'); }
+    catch (e) { setStatus(e.message, 'err'); }
+    return;
+  }
+  if (data.rawText){
+    await extractWithAI(data.rawText, data.source === 'microsoft' ? 'JSON interno de Microsoft Forms' : 'texto de la página de Google Forms', url);
+    return;
+  }
+  setStatus(data.error || 'No se pudo leer el formulario.', 'err');
+});
+
+// PDF → texto (pdf.js) → IA
+async function pdfToText(file){
+  if (!window.pdfjsLib) throw new Error('No se pudo cargar el lector de PDF. Revisa tu conexión.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let text = '';
+  for (let i = 1; i <= Math.min(pdf.numPages, 40); i++){
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    text += tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('') + '\n\n';
+    if (text.length > 80000) break;
+  }
+  return text.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+async function handlePdf(file){
+  if (!file) return;
+  if (!/pdf$/i.test(file.type) && !/\.pdf$/i.test(file.name)){ setStatus('El archivo debe ser un PDF.', 'err'); return; }
+  setStatus('Leyendo el PDF…', 'busy');
+  try {
+    const text = await pdfToText(file);
+    if (text.length < 20) throw new Error('El PDF no contiene texto seleccionable (¿es una imagen escaneada?). Prueba a pegar el texto.');
+    await extractWithAI(text, 'texto extraído de un PDF del formulario', '');
+  } catch (e) { setStatus(e.message, 'err'); }
+}
+$('#pdfFile').addEventListener('change', e => { handlePdf(e.target.files[0]); e.target.value = ''; });
+const drop = $('#drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handlePdf(e.dataTransfer.files[0]));
+
+$('#readText').addEventListener('click', () => {
+  const t = $('#formText').value.trim();
+  if (t.length < 10){ setStatus('Pega el texto del formulario.', 'err'); return; }
+  extractWithAI(t, 'texto pegado por el usuario', '');
+});
+
+const EXTRACT_SYSTEM = 'Eres un analizador de cuestionarios. Extraes con precisión la estructura de formularios (Google Forms, Microsoft Forms u otros) y respondes solo con JSON válido.';
+function extractPrompt(content, kind){
+  return `A partir del siguiente ${kind}, extrae TODAS las preguntas del formulario en su orden original.
+
+Devuelve exactamente este JSON:
+{"title": "título del formulario", "description": "descripción breve o vacía",
+ "questions": [{"title": "texto de la pregunta", "description": "aclaración o vacío", "type": "uno de: short | paragraph | single | dropdown | multiple | scale | rating | grid_single | grid_multiple | ranking | date | time | file",
+   "options": ["opciones de respuesta, si las hay"], "other": false, "required": false,
+   "scale": {"min": 1, "max": 5, "minLabel": "", "maxLabel": ""}, "rows": [], "columns": [], "section": "nombre de la sección o vacío"}]}
+
+Reglas:
+- short = respuesta corta; paragraph = respuesta larga; single = una sola opción (botones de radio); dropdown = desplegable; multiple = casillas (varias opciones); scale = escala lineal numérica; rating = estrellas/valoración; grid_* = cuadrícula o escala Likert con filas (afirmaciones) y columnas (opciones); ranking = ordenar opciones.
+- "other": true si existe una opción «Otra/Otro» con texto libre (no la incluyas en options).
+- "required": true si la pregunta está marcada como obligatoria (asterisco).
+- Incluye "scale" solo en scale/rating y "rows"/"columns" solo en cuadrículas.
+- No inventes preguntas. Ignora instrucciones generales, avisos legales, botones, números de página y textos de navegación.
+
+CONTENIDO:
+<<<
+${content.slice(0, 60000)}
+>>>`;
+}
+async function extractWithAI(content, kind, url){
+  const cfg = aiConfig();
+  if (!cfg.key){ setStatus('Para analizar este formulario con IA, pega antes tu clave de API en el paso 3.', 'err'); $('#apiKey').focus(); return; }
+  setStatus('La IA está identificando las preguntas…', 'busy');
+  try {
+    const txt = await callModel(EXTRACT_SYSTEM, extractPrompt(content, kind), { temperature: 0.1 });
+    const data = parseJSON(txt);
+    setForm({ ...data, source: state.src, url });
+    setStatus(`Formulario analizado: ${state.form.questions.length} preguntas. Revisa que los tipos y opciones sean correctos.`, 'ok');
+  } catch (e) {
+    setStatus(e.userMessage || ('No se pudo analizar el formulario: ' + e.message), 'err');
+  }
+}
+
+/* ====================== Paso 2: perfiles ====================== */
+function renderFields(){
+  $('#fields').innerHTML = state.fields.map((f, i) => `
+    <div class="field">
+      <input type="text" value="${esc(f.name)}" data-fi="${i}" data-k="name" placeholder="Nombre del campo" aria-label="Nombre del campo">
+      <textarea data-fi="${i}" data-k="values" rows="4" placeholder="Valor: peso (uno por línea). Vacío = lo decide la IA" aria-label="Valores de ${esc(f.name)}">${esc(f.values)}</textarea>
+      <button class="btn small ghost" data-del="${i}" title="Quitar campo" aria-label="Quitar campo ${esc(f.name)}">✕</button>
+    </div>`).join('');
+}
+$('#fields').addEventListener('input', e => {
+  const i = e.target.dataset.fi; if (i === undefined) return;
+  state.fields[+i][e.target.dataset.k] = e.target.value; persist();
+});
+$('#fields').addEventListener('click', e => {
+  const d = e.target.closest('[data-del]'); if (!d) return;
+  state.fields.splice(+d.dataset.del, 1); renderFields(); persist();
+});
+$('#addField').addEventListener('click', () => {
+  state.fields.push({ name: '', values: '' }); renderFields(); persist();
+  const inputs = $$('#fields input'); inputs[inputs.length - 1].focus();
+});
+
+function parseWeighted(text){
+  let lines = String(text || '').split(/\n/).map(s => s.trim()).filter(Boolean);
+  if (lines.length === 1 && lines[0].includes(',')) lines = lines[0].split(',').map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for (const l of lines){
+    let m = l.match(/^(.+?)\s*[:=]\s*(\d+(?:[.,]\d+)?)\s*%?$/) || l.match(/^(.+?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*%?\s*\)$/);
+    const name = (m ? m[1] : l).trim(), w = m ? parseFloat(m[2].replace(',', '.')) : 1;
+    if (name && w > 0) out.push({ name, w });
+  }
+  return out;
+}
+// Reparto exacto según pesos (método del mayor resto) y barajado
+function allocate(items, n){
+  const tot = items.reduce((s, x) => s + x.w, 0);
+  const raw = items.map(x => x.w / tot * n), base = raw.map(Math.floor);
+  let rem = n - base.reduce((a, b) => a + b, 0);
+  raw.map((r, i) => [r - base[i] + Math.random() * 1e-9, i]).sort((a, b) => b[0] - a[0]).slice(0, rem).forEach(([, i]) => base[i]++);
+  const arr = []; items.forEach((x, i) => { for (let k = 0; k < base[i]; k++) arr.push(x.name); });
+  return shuffle(arr);
+}
+function profileFields(){ return state.fields.map(f => ({ name: f.name.trim(), items: parseWeighted(f.values) })).filter(f => f.name); }
+function buildPersonas(n){
+  const fields = profileFields();
+  const useAge = $('#useAge').checked;
+  let a = parseInt($('#ageMin').value, 10), b = parseInt($('#ageMax').value, 10);
+  if (!Number.isFinite(a)) a = 18; if (!Number.isFinite(b)) b = a; if (b < a) [a, b] = [b, a];
+  const cols = {};
+  fields.forEach(f => { if (f.items.length) cols[f.name] = allocate(f.items, n); });
+  const pad = String(n).length < 3 ? 3 : String(n).length;
+  return Array.from({ length: n }, (_, i) => {
+    const p = { id: 'R' + String(i + 1).padStart(pad, '0') };
+    if (useAge) p.edad = randInt(a, b);
+    fields.forEach(f => { if (cols[f.name]) p[f.name] = cols[f.name][i]; });
+    return p;
+  });
+}
+
+/* ====================== Paso 3: modelo ====================== */
+function aiConfig(){
+  return { provider: $('#provider').value, model: $('#model').value.trim(), key: $('#apiKey').value.trim(), baseUrl: $('#baseUrl').value.trim().replace(/\/+$/, '') };
+}
+function syncProvider(){
+  const p = $('#provider').value;
+  $('#baseUrlBox').hidden = p !== 'openai';
+  $('#keyHelp').innerHTML = p === 'gemini'
+    ? 'Consigue una clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> (botón «Create API key»). La clave solo se usa desde tu navegador; no pasa por el servidor de esta aplicación.'
+    : 'Usa la URL base y el nombre de modelo que indique tu proveedor (por ejemplo, Groq u OpenRouter, que tienen modelos gratuitos). La clave solo se usa desde tu navegador.';
+}
+$('#provider').addEventListener('change', () => {
+  const p = $('#provider').value, m = $('#model');
+  if (p === 'openai' && /^gemini/.test(m.value)) m.value = '';
+  if (p === 'gemini' && !/^gemini/.test(m.value)) m.value = 'gemini-3.8-flash';
+  m.placeholder = p === 'openai' ? 'nombre del modelo' : '';
+  syncProvider(); persist();
+});
+
+class ApiError extends Error {
+  constructor(msg, { status = 0, retryable = false, retryAfter = 0, fatal = false, userMessage = '' } = {}){
+    super(msg); Object.assign(this, { status, retryable, retryAfter, fatal, userMessage });
+  }
+}
+function apiError(status, message, retryAfter){
+  const m = String(message || '');
+  if (status === 429) return new ApiError(m, { status, retryable: true, retryAfter,
+    userMessage: 'Se ha agotado la cuota gratuita del modelo por ahora. Espera un rato, sube la pausa o cambia a un modelo «flash-lite».' });
+  if (status >= 500) return new ApiError(m, { status, retryable: true, retryAfter, userMessage: 'El servicio de IA está saturado. Inténtalo de nuevo en unos minutos.' });
+  if (status === 400 && /api key|API_KEY/i.test(m) || status === 401 || status === 403)
+    return new ApiError(m, { status, fatal: true, userMessage: 'La clave de API no es válida o no tiene permiso para este modelo.' });
+  if (status === 404) return new ApiError(m, { status, fatal: true, userMessage: `No existe el modelo «${$('#model').value}». Elige otro de la lista.` });
+  return new ApiError(m, { status, fatal: status === 400, userMessage: 'Error del servicio de IA: ' + m.slice(0, 200) });
+}
+
+async function callGemini(system, user, { temperature, signal }){
+  const cfg = aiConfig();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`;
+  const body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
+    generationConfig: { temperature, responseMimeType: 'application/json' } };
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.key }, body: JSON.stringify(body), signal });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok){
+    const ri = (data.error?.details || []).find(d => d.retryDelay);
+    throw apiError(res.status, data.error?.message || res.statusText, ri ? parseFloat(ri.retryDelay) : 0);
+  }
+  const cand = data.candidates?.[0];
+  if (!cand) throw new ApiError('Respuesta vacía' + (data.promptFeedback?.blockReason ? ' (' + data.promptFeedback.blockReason + ')' : ''), { retryable: true });
+  const text = (cand.content?.parts || []).filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
+  if (cand.finishReason === 'MAX_TOKENS') throw new ApiError('Respuesta cortada por longitud', { status: 'TRUNC', retryable: false });
+  if (!text) throw new ApiError('Respuesta vacía (' + (cand.finishReason || '¿?') + ')', { retryable: true });
+  return text;
+}
+async function callOpenAI(system, user, { temperature, signal }, useFormat = true){
+  const cfg = aiConfig();
+  if (!cfg.baseUrl) throw new ApiError('Falta la URL base', { fatal: true, userMessage: 'Indica la URL base de la API del proveedor.' });
+  const body = { model: cfg.model, temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+  if (useFormat) body.response_format = { type: 'json_object' };
+  const res = await fetch(cfg.baseUrl + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key }, body: JSON.stringify(body), signal });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok){
+    const msg = data.error?.message || res.statusText;
+    if (res.status === 400 && useFormat && /response_format|json/i.test(msg)) return callOpenAI(system, user, { temperature, signal }, false);
+    throw apiError(res.status, msg, parseFloat(res.headers.get('retry-after')) || 0);
+  }
+  const ch = data.choices?.[0];
+  if (ch?.finish_reason === 'length') throw new ApiError('Respuesta cortada por longitud', { status: 'TRUNC' });
+  const text = ch?.message?.content;
+  if (!text) throw new ApiError('Respuesta vacía', { retryable: true });
+  return text;
+}
+async function callModel(system, user, { temperature = 0.9, signal, onWait } = {}){
+  const cfg = aiConfig();
+  if (!cfg.key) throw new ApiError('Sin clave', { fatal: true, userMessage: 'Falta la clave de API (paso 3).' });
+  if (!cfg.model) throw new ApiError('Sin modelo', { fatal: true, userMessage: 'Indica el nombre del modelo (paso 3).' });
+  for (let attempt = 0; ; attempt++){
+    try {
+      return await (cfg.provider === 'gemini' ? callGemini : callOpenAI)(system, user, { temperature, signal });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      if (e instanceof TypeError) throw new ApiError(e.message, { fatal: true, userMessage: 'No se pudo conectar con el servicio de IA (¿sin conexión o la URL base no admite llamadas desde el navegador?).' });
+      if (e.retryable && attempt < 4){
+        const wait = clamp(Math.ceil(e.retryAfter || 6 * 2 ** attempt), 3, 90);
+        onWait && onWait(wait, e);
+        await sleep(wait * 1000, signal);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+function parseJSON(txt){
+  let t = String(txt).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  try { return JSON.parse(t); } catch {}
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a >= 0 && b > a){ try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  const c = t.indexOf('['), d = t.lastIndexOf(']');
+  if (c >= 0 && d > c){ try { return { encuestados: JSON.parse(t.slice(c, d + 1)) }; } catch {} }
+  throw new ApiError('JSON no válido en la respuesta', { status: 'JSON' });
+}
+
+/* ====================== Paso 4: generación ====================== */
+const VARIABILITY = {
+  baja: { t: 0.6, txt: 'Las opiniones del grupo son bastante homogéneas, con pocas discrepancias.' },
+  media: { t: 0.9, txt: 'Refleja la diversidad realista de una muestra: mayoría de posturas moderadas, algunas muy positivas, algunas críticas y algunas indiferentes.' },
+  alta: { t: 1.15, txt: 'Las opiniones están muy repartidas y polarizadas: muchas respuestas en los extremos y desacuerdos marcados entre personas.' }
+};
+const OPENLEN = { breves: 'Las respuestas abiertas son breves y naturales (de unas pocas palabras a una o dos frases), como en encuestas reales.',
+  medias: 'Las respuestas abiertas tienen una extensión media (una a tres frases).', detalladas: 'Las respuestas abiertas son detalladas (tres a seis frases) y argumentadas.' };
+
+function questionSpec(q){
+  const s = { id: q.id, tipo: q.type, pregunta: q.title };
+  if (q.description) s.aclaracion = q.description.slice(0, 300);
+  if (q.section) s.seccion = q.section;
+  if (q.required) s.obligatoria = true;
+  if (q.options.length) s.opciones = q.options;
+  if (q.other) s.admite_otra = true;
+  if (q.scale) s.escala = q.scale;
+  if (q.rows){ s.filas = q.rows; s.columnas = q.columns; }
+  return s;
+}
+const GEN_SYSTEM = 'Simulas encuestados verosímiles para pilotar cuestionarios. Cada encuestado es una persona distinta con su propio perfil, opiniones y forma de expresarse. Respondes solo con JSON válido.';
+function genPrompt(personas){
+  const f = state.form, qs = f.questions.filter(q => q.include);
+  const fields = profileFields();
+  const free = fields.filter(x => !x.items.length).map(x => x.name);
+  const v = VARIABILITY[$('#variability').value] || VARIABILITY.media;
+  return `FORMULARIO: «${f.title}»${f.description ? `\nDescripción: ${f.description.slice(0, 800)}` : ''}
+
+PÚBLICO OBJETIVO: ${$('#audience').value.trim() || 'población general adulta'}
+${$('#context').value.trim() ? `CONTEXTO E INSTRUCCIONES: ${$('#context').value.trim()}\n` : ''}
+PREGUNTAS (JSON):
+${JSON.stringify(qs.map(questionSpec))}
+
+ENCUESTADOS A SIMULAR (perfil fijado; respétalo):
+${JSON.stringify(personas)}
+
+INSTRUCCIONES:
+- Para cada encuestado, imagina primero quién es (ocupación o situación, actitudes, experiencias) de forma coherente con el público objetivo y con su perfil, y descríbelo en una frase en "perfil".
+${free.length ? `- Asigna a cada encuestado un valor plausible para: ${free.join(', ')}; devuélvelos en "atributos".\n` : ''}- Responde a TODAS las preguntas como lo haría esa persona, con coherencia entre sus respuestas.
+- ${v.txt} Evita que todos los encuestados respondan igual.
+- ${OPENLEN[$('#openLen').value] || OPENLEN.medias} Varía el estilo de redacción según la persona. Escribe las respuestas abiertas en ${$('#lang').value.trim() || 'español'}.
+- No menciones que eres una IA ni que las respuestas son simuladas.
+
+FORMATO DE CADA RESPUESTA SEGÚN "tipo":
+- short / paragraph: texto.
+- single / dropdown: texto idéntico a una de las "opciones" (si "admite_otra", puedes escribir otra respuesta breve).
+- multiple: lista de textos, cada uno idéntico a una opción (si "admite_otra", puedes añadir otra respuesta breve).
+- scale / rating: número entero entre escala.min y escala.max.
+- grid_single: objeto {"fila": "columna"} con todas las filas.
+- grid_multiple: objeto {"fila": ["columna", ...]} con todas las filas.
+- ranking: lista con todas las opciones ordenadas de más a menos preferida.
+- date: "AAAA-MM-DD". time: "HH:MM".
+- Las preguntas no obligatorias pueden quedar en null solo de vez en cuando, si es realista.
+
+Devuelve exactamente:
+{"encuestados": [{"id": "R001", "perfil": "…",${free.length ? ' "atributos": {"Campo": "valor"},' : ''} "respuestas": {"q1": …, "q2": …}}]}
+con un elemento por cada encuestado indicado (${personas.length}), en el mismo orden y con los mismos "id".`;
+}
+
+// --- Validación y conversión a celdas de Excel ---
+function matchOption(opts, v){
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim(); if (!s) return null;
+  let m = opts.find(o => o === s); if (m) return m;
+  const low = s.toLowerCase().replace(/\s+/g, ' ');
+  m = opts.find(o => o.toLowerCase().replace(/\s+/g, ' ') === low); if (m) return m;
+  const cands = opts.filter(o => { const ol = o.toLowerCase(); return ol.length > 2 && (low.includes(ol) || ol.includes(low)); });
+  return cands.length === 1 ? cands[0] : null;
+}
+function getKey(obj, key){
+  if (!obj || typeof obj !== 'object') return undefined;
+  if (key in obj) return obj[key];
+  const low = key.toLowerCase().trim();
+  const k = Object.keys(obj).find(x => x.toLowerCase().trim() === low) || Object.keys(obj).find(x => { const xl = x.toLowerCase(); return xl.length > 3 && (xl.includes(low) || low.includes(xl)); });
+  return k !== undefined ? obj[k] : undefined;
+}
+// Devuelve { cells: [...], bad: n } — una celda por columna de la pregunta
+function cellsFor(q, v){
+  let bad = 0;
+  const asText = x => (x === null || x === undefined) ? '' : (typeof x === 'object' ? JSON.stringify(x) : String(x).trim());
+  switch (q.type){
+    case 'single': case 'dropdown': {
+      if (v === null || v === undefined || v === '') return { cells: [''], bad };
+      const raw = Array.isArray(v) ? v[0] : v;
+      const m = matchOption(q.options, raw);
+      if (m) return { cells: [m], bad };
+      if (q.other && asText(raw)) return { cells: [asText(raw)], bad };
+      return { cells: [''], bad: 1 };
+    }
+    case 'multiple': {
+      if (v === null || v === undefined || v === '') return { cells: [''], bad };
+      const arr = Array.isArray(v) ? v : String(v).split(/\s*[;,]\s*/);
+      const out = [];
+      arr.forEach(x => { const m = matchOption(q.options, x); if (m) out.push(m); else if (q.other && asText(x)) out.push(asText(x)); else if (asText(x)) bad = 1; });
+      return { cells: [[...new Set(out)].join(', ')], bad };
+    }
+    case 'scale': case 'rating': {
+      if (v === null || v === undefined || v === '') return { cells: [''], bad };
+      const n = Math.round(parseFloat(String(v).replace(',', '.')));
+      if (!Number.isFinite(n)) return { cells: [''], bad: 1 };
+      return { cells: [clamp(n, q.scale.min, q.scale.max)], bad: (n < q.scale.min || n > q.scale.max) ? 1 : 0 };
+    }
+    case 'grid_single': case 'grid_multiple': {
+      const obj = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+      const cells = q.rows.map((r, i) => {
+        let x = getKey(obj, r);
+        if (x === undefined && Array.isArray(v)) x = v[i];
+        if (x === undefined || x === null || x === '') return '';
+        if (q.type === 'grid_single'){ const m = matchOption(q.columns, Array.isArray(x) ? x[0] : x); if (!m) bad = 1; return m || ''; }
+        const arr = (Array.isArray(x) ? x : String(x).split(/\s*[;,]\s*/)).map(y => matchOption(q.columns, y)).filter(Boolean);
+        return [...new Set(arr)].join(', ');
+      });
+      return { cells, bad };
+    }
+    case 'ranking': {
+      const arr = (Array.isArray(v) ? v : String(v ?? '').split(/\s*[;,>]\s*/)).map(x => matchOption(q.options, x)).filter(Boolean);
+      const uniq = [...new Set(arr)]; q.options.forEach(o => { if (!uniq.includes(o)) uniq.push(o); });
+      return { cells: [v === null || v === undefined ? '' : uniq.join('; ')], bad };
+    }
+    default:
+      return { cells: [asText(v)], bad };
+  }
+}
+
+function includedQuestions(){ return state.form ? state.form.questions.filter(q => q.include) : []; }
+function profileColumns(){
+  const cols = [];
+  if (state.results.some(r => r.persona.edad !== undefined)) cols.push('Edad');
+  const names = new Set();
+  state.results.forEach(r => { Object.keys(r.persona).forEach(k => { if (k !== 'id' && k !== 'edad') names.add(k); }); Object.keys(r.atributos || {}).forEach(k => names.add(k)); });
+  profileFields().forEach(f => names.add(f.name));
+  return cols.concat([...names]);
+}
+function profileValue(r, col){
+  if (col === 'Edad') return r.persona.edad ?? '';
+  const v = r.persona[col] ?? getKey(r.atributos, col);
+  return v === undefined || v === null ? '' : (typeof v === 'object' ? JSON.stringify(v) : v);
+}
+function buildTable(){
+  const qs = includedQuestions(), pcols = $('#profileCols').checked ? profileColumns() : [];
+  const headers = ['ID', ...pcols];
+  qs.forEach(q => { if (q.rows) q.rows.forEach(r => headers.push(`${q.title} [${r}]`)); else headers.push(q.title); });
+  const rows = [...state.results].sort((a, b) => a.id.localeCompare(b.id)).map(r =>
+    [r.id, ...pcols.map(c => profileValue(r, c)), ...qs.flatMap(q => cellsFor(q, r.answers[q.id]).cells)]);
+  return { headers, rows };
+}
+
+// --- Bucle principal ---
+function log(msg, cls = ''){
+  const el = $('#log'), line = document.createElement('div');
+  const t = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  line.textContent = `[${t}] ${msg}`; if (cls) line.className = cls;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
+}
+function setProgress(done, total, extra = ''){
+  $('#barFill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  $('#progressTxt').textContent = `${done} de ${total} respuestas generadas${extra ? ' · ' + extra : ''}`;
+}
+function setRunning(on){
+  state.running = on;
+  $('#genBtn').disabled = on; $('#stopBtn').hidden = !on;
+  $('#xlsxBtn').disabled = on || !state.results.length;
+  $('#clearBtn').hidden = on || !state.results.length;
+  $$('#readLink, #readText, #pdfFile').forEach(b => { b.disabled = on; });
+}
+
+$('#genBtn').addEventListener('click', async () => {
+  if (state.running) return;
+  if (!state.form){ alertBox('Primero introduce un formulario (paso 1).'); return; }
+  const qs = includedQuestions();
+  if (!qs.length){ alertBox('Incluye al menos una pregunta (paso 1).'); return; }
+  const cfg = aiConfig();
+  if (!cfg.key){ alertBox('Pega tu clave de API (paso 3).'); $('#apiKey').focus(); return; }
+  const n = clamp(parseInt($('#nResp').value, 10) || 0, 1, 1000);
+  $('#nResp').value = n;
+  persist();
+
+  let batchSize = clamp(parseInt($('#batch').value, 10) || 8, 1, 20);
+  const pause = clamp(parseFloat($('#pause').value) || 0, 0, 120);
+  const temperature = (VARIABILITY[$('#variability').value] || VARIABILITY.media).t;
+
+  state.results = []; renderResults();
+  const personas = buildPersonas(n);
+  const queue = personas.map(p => ({ p, tries: 0 }));
+  const failed = [];
+  let call = 0, badCells = 0;
+  state.ctrl = new AbortController();
+  const signal = state.ctrl.signal;
+  $('#progressBox').hidden = false; $('#log').innerHTML = '';
+  setRunning(true); setProgress(0, n);
+  log(`Empezando: ${n} encuestados, ${qs.length} preguntas, modelo ${cfg.model}.`);
+
+  try {
+    while (queue.length){
+      const batch = queue.splice(0, batchSize);
+      call++;
+      setProgress(state.results.length, n, `petición ${call}`);
+      try {
+        const txt = await callModel(GEN_SYSTEM, genPrompt(batch.map(x => x.p)), {
+          temperature, signal,
+          onWait: (s, e) => log(`${e.status === 429 ? 'Límite de peticiones' : 'Servicio ocupado'}: espero ${s} s y reintento…`, 'w')
+        });
+        const data = parseJSON(txt);
+        const list = Array.isArray(data) ? data : (data.encuestados || data.respuestas || data.respondents || []);
+        const byId = new Map((Array.isArray(list) ? list : []).map(x => [String(x?.id ?? '').trim(), x]));
+        let got = 0;
+        batch.forEach((item, idx) => {
+          let r = byId.get(item.p.id);
+          if (!r && list.length === batch.length) r = list[idx];
+          const answers = r && (r.respuestas || r.answers || r.r);
+          if (answers && typeof answers === 'object'){
+            state.results.push({ id: item.p.id, persona: item.p, perfil: String(r.perfil || r.profile || ''), atributos: r.atributos || {}, answers });
+            qs.forEach(q => { badCells += cellsFor(q, answers[q.id]).bad; });
+            got++;
+          } else if (++item.tries < 3) queue.push(item); else failed.push(item.p);
+        });
+        log(`Petición ${call}: ${got}/${batch.length} encuestados recibidos.`, got === batch.length ? 'o' : 'w');
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        if (e.fatal){ log(e.userMessage || e.message, 'e'); break; }
+        if (e.status === 'TRUNC' && batchSize > 1){
+          batchSize = Math.max(1, Math.floor(batchSize / 2));
+          log(`La respuesta era demasiado larga; bajo a ${batchSize} encuestados por petición.`, 'w');
+          queue.unshift(...batch); continue;
+        }
+        if (e.status === 429 || (typeof e.status === 'number' && e.status >= 500)){ log(e.userMessage || e.message, 'e'); queue.unshift(...batch); break; }
+        log(`Petición ${call} fallida (${e.message}); se reintentará.`, 'w');
+        batch.forEach(item => { if (++item.tries < 3) queue.push(item); else failed.push(item.p); });
+      }
+      renderResults(); setProgress(state.results.length, n);
+      if (queue.length && pause) await sleep(pause * 1000, signal);
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') log('Generación detenida por ti.', 'w'); else log('Error: ' + (e.userMessage || e.message), 'e');
+  }
+  const pending = queue.length + failed.length;
+  setProgress(state.results.length, n, pending ? `${pending} sin generar` : 'completado');
+  if (state.results.length) log(`Listo: ${state.results.length} respuestas.${badCells ? ` Se corrigieron o vaciaron ${badCells} valores que no coincidían con las opciones.` : ''} Pulsa «Descargar Excel».`, 'o');
+  setRunning(false); renderResults();
+});
+$('#stopBtn').addEventListener('click', () => { if (state.ctrl) state.ctrl.abort(); });
+$('#clearBtn').addEventListener('click', () => { state.results = []; renderResults(); $('#progressBox').hidden = true; setRunning(false); });
+
+function alertBox(msg){
+  $('#progressBox').hidden = false; $('#log').innerHTML = ''; log(msg, 'e');
+  $('#progressTxt').textContent = ''; $('#barFill').style.width = '0';
+}
+
+function renderResults(){
+  const has = state.results.length > 0;
+  $('#previewWrap').hidden = !has;
+  $('#xlsxBtn').disabled = state.running || !has;
+  $('#clearBtn').hidden = state.running || !has;
+  if (!has){ $('#preview').innerHTML = ''; return; }
+  const { headers, rows } = buildTable();
+  const shown = rows.slice(0, 60);
+  $('#preview').innerHTML = `<thead><tr>${headers.map(h => `<th title="${esc(h)}">${esc(h.length > 40 ? h.slice(0, 38) + '…' : h)}</th>`).join('')}</tr></thead>` +
+    `<tbody>${shown.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>` +
+    (rows.length > shown.length ? `<tfoot><tr><td colspan="${headers.length}">… y ${rows.length - shown.length} filas más en el Excel</td></tr></tfoot>` : '');
+}
+$('#profileCols').addEventListener('change', () => { persist(); renderResults(); });
+
+/* ====================== Exportar a Excel ====================== */
+function styleHeader(ws){
+  const h = ws.getRow(1);
+  h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E5F' } };
+  h.alignment = { vertical: 'middle', wrapText: true };
+  h.height = 32;
+}
+function slug(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'formulario'; }
+
+$('#xlsxBtn').addEventListener('click', async () => {
+  if (!window.ExcelJS){ alertBox('No se pudo cargar la librería de Excel. Revisa tu conexión y recarga la página.'); return; }
+  const { headers, rows } = buildTable();
+  const qs = includedQuestions(), cfg = aiConfig();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Respuestas simuladas con IA'; wb.created = new Date();
+
+  const ws = wb.addWorksheet('Respuestas', { views: [{ state: 'frozen', ySplit: 1, xSplit: 1 }] });
+  ws.columns = headers.map((h, i) => {
+    const longest = Math.max(h.length * 0.8, ...rows.slice(0, 200).map(r => String(r[i] ?? '').length));
+    return { header: h, width: clamp(Math.round(longest) + 2, 8, 60) };
+  });
+  rows.forEach(r => ws.addRow(r));
+  styleHeader(ws);
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+  ws.eachRow((row, i) => { if (i > 1) row.alignment = { vertical: 'top', wrapText: true }; });
+
+  const wp = wb.addWorksheet('Perfiles', { views: [{ state: 'frozen', ySplit: 1 }] });
+  const pcols = profileColumns();
+  wp.columns = [{ header: 'ID', width: 8 }, ...pcols.map(c => ({ header: c, width: 18 })), { header: 'Perfil (descripción generada)', width: 90 }];
+  [...state.results].sort((a, b) => a.id.localeCompare(b.id)).forEach(r => wp.addRow([r.id, ...pcols.map(c => profileValue(r, c)), r.perfil]));
+  styleHeader(wp);
+  wp.eachRow((row, i) => { if (i > 1) row.alignment = { vertical: 'top', wrapText: true }; });
+
+  const wq = wb.addWorksheet('Preguntas', { views: [{ state: 'frozen', ySplit: 1 }] });
+  wq.columns = [{ header: 'Nº', width: 5 }, { header: 'Pregunta', width: 60 }, { header: 'Tipo', width: 18 }, { header: 'Opciones / escala', width: 60 }, { header: 'Obligatoria', width: 11 }, { header: 'Sección', width: 22 }];
+  qs.forEach((q, i) => wq.addRow([i + 1, q.title, TYPE_LABEL[q.type] || q.type,
+    q.scale ? `${q.scale.min}–${q.scale.max}${q.scale.minLabel || q.scale.maxLabel ? ` (${q.scale.minLabel} … ${q.scale.maxLabel})` : ''}`
+      : q.rows ? `Filas: ${q.rows.join(' | ')}\nColumnas: ${q.columns.join(' | ')}` : q.options.join(' | ') + (q.other ? ' | Otra' : ''),
+    q.required ? 'Sí' : 'No', q.section || '']));
+  styleHeader(wq);
+  wq.eachRow((row, i) => { if (i > 1) row.alignment = { vertical: 'top', wrapText: true }; });
+
+  const wi = wb.addWorksheet('Información');
+  wi.columns = [{ header: 'Dato', width: 30 }, { header: 'Valor', width: 100 }];
+  const fieldsTxt = profileFields().map(f => `${f.name}: ${f.items.length ? f.items.map(x => `${x.name} (${x.w})`).join(', ') : 'elegido por la IA'}`).join('\n');
+  [
+    ['AVISO', 'Respuestas SINTÉTICAS generadas con inteligencia artificial. No proceden de personas reales. Úsalas solo para pilotar el cuestionario, probar análisis o con fines docentes, y no las presentes como datos recogidos.'],
+    ['Formulario', state.form.title],
+    ['Origen', state.form.url || ({ pdf: 'PDF', text: 'Texto pegado' }[state.form.source] || state.form.source || '')],
+    ['Generado el', new Date().toLocaleString('es-ES')],
+    ['Modelo de IA', `${cfg.provider === 'gemini' ? 'Google Gemini' : cfg.baseUrl} · ${cfg.model}`],
+    ['Respuestas', state.results.length],
+    ['Público objetivo', $('#audience').value.trim()],
+    ['Contexto e instrucciones', $('#context').value.trim()],
+    ['Edad', $('#useAge').checked ? `${$('#ageMin').value}–${$('#ageMax').value}` : 'no usada'],
+    ['Campos del perfil', fieldsTxt],
+    ['Diversidad de opiniones', $('#variability').value],
+    ['Respuestas abiertas', $('#openLen').value + ' · ' + $('#lang').value]
+  ].forEach(r => wi.addRow(r));
+  styleHeader(wi);
+  wi.eachRow((row, i) => { if (i > 1){ row.alignment = { vertical: 'top', wrapText: true }; row.getCell(1).font = { bold: true }; } });
+  wi.getRow(2).getCell(2).font = { bold: true, color: { argb: 'FFA3271D' } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `respuestas-simuladas-${slug(state.form.title)}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+
+/* ====================== Inicio ====================== */
+settingIds.forEach(id => $('#' + id).addEventListener('change', persist));
+$('#apiKey').addEventListener('change', persist);
+loadSettings(); syncProvider(); renderFields();
+if (state.form){ try { state.form.questions = normalizeQuestions(state.form.questions); if (!state.form.questions.length) throw 0; renderForm(); } catch { state.form = null; } }
+window.__app = { state, buildTable, cellsFor, buildPersonas }; // para pruebas
+})();
+</script>
+</body>
+</html>

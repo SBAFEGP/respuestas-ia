@@ -1,0 +1,9 @@
+# Render: servicio web gratuito con Node (sin dependencias que instalar)
+services:
+  - type: web
+    name: respuestas-ia
+    runtime: node
+    plan: free
+    buildCommand: echo "Sin dependencias"
+    startCommand: node server.mjs
+    healthCheckPath: /healthz
