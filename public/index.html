@@ -266,10 +266,10 @@ footer{max-width:1100px;margin:0 auto;padding:.5rem 1rem 1.5rem;color:var(--mute
     <details class="adv">
       <summary>Ajustes de velocidad</summary>
       <div class="grid3" style="margin-top:.6rem">
-        <div><label class="lbl" for="batch">Encuestados por petición</label><input type="number" id="batch" min="1" max="20" value="8"></div>
+        <div><label class="lbl" for="batch">Encuestados por petición</label><input type="number" id="batch" min="1" max="10" value="6"></div>
         <div><label class="lbl" for="pause">Pausa entre peticiones (s)</label><input type="number" id="pause" min="0" max="120" value="4"></div>
       </div>
-      <p class="hint">Si aparecen avisos de límite de peticiones, sube la pausa o cambia a un modelo «flash-lite», que suele tener más cuota gratuita.</p>
+      <p class="hint">Recomendado: 5–6 encuestados por petición (máximo 10). Si aparecen avisos de límite de peticiones, sube la pausa o cambia a un modelo «flash-lite», que es más rápido y suele tener más cuota gratuita.</p>
     </details>
     <div class="note">En el nivel gratuito, Google puede usar el contenido enviado para mejorar sus productos. No incluyas datos personales reales en el formulario ni en las instrucciones.</div>
   </section>
@@ -541,7 +541,9 @@ async function extractWithAI(content, kind, url){
   if (!cfg.key){ setStatus('Para analizar este formulario con IA, pega antes tu clave de API en el paso 3.', 'err'); $('#apiKey').focus(); return; }
   setStatus('La IA está identificando las preguntas…', 'busy');
   try {
-    const txt = await callModel(EXTRACT_SYSTEM, extractPrompt(content, kind), { temperature: 0.1 });
+    const txt = await callModel(EXTRACT_SYSTEM, extractPrompt(content, kind), { temperature: 0.1, timeoutSec: 120,
+      onTick: s => setStatus(`La IA está identificando las preguntas… ${s} s`, 'busy'),
+      onWait: s => setStatus(`Límite de peticiones alcanzado; reintento en ${s} s…`, 'busy') });
     const data = parseJSON(txt);
     setForm({ ...data, source: state.src, url });
     setStatus(`Formulario analizado: ${state.form.questions.length} preguntas. Revisa que los tipos y opciones sean correctos.`, 'ok');
@@ -644,13 +646,21 @@ function apiError(status, message, retryAfter){
   return new ApiError(m, { status, fatal: status === 400, userMessage: 'Error del servicio de IA: ' + m.slice(0, 200) });
 }
 
+const noThinkCfg = new Set(); // modelos que rechazan thinkingConfig
 async function callGemini(system, user, { temperature, signal }){
   const cfg = aiConfig();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`;
   const body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
     generationConfig: { temperature, responseMimeType: 'application/json' } };
+  // Razonamiento al mínimo útil: rellenar encuestas no lo necesita y lo hace mucho más lento
+  const thinking = /^gemini-3/i.test(cfg.model) && !noThinkCfg.has(cfg.model);
+  if (thinking) body.generationConfig.thinkingConfig = { thinkingLevel: /lite/i.test(cfg.model) ? 'minimal' : 'low' };
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.key }, body: JSON.stringify(body), signal });
   const data = await res.json().catch(() => ({}));
+  if (!res.ok && res.status === 400 && thinking && /thinking/i.test(data.error?.message || '')){
+    noThinkCfg.add(cfg.model);
+    return callGemini(system, user, { temperature, signal });
+  }
   if (!res.ok){
     const ri = (data.error?.details || []).find(d => d.retryDelay);
     throw apiError(res.status, data.error?.message || res.statusText, ri ? parseFloat(ri.retryDelay) : 0);
@@ -680,14 +690,28 @@ async function callOpenAI(system, user, { temperature, signal }, useFormat = tru
   if (!text) throw new ApiError('Respuesta vacía', { retryable: true });
   return text;
 }
-async function callModel(system, user, { temperature = 0.9, signal, onWait } = {}){
+// Combina la señal de «Detener» con un tiempo máximo por petición
+function timedSignal(outer, ms){
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const t = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+  const onAbort = () => ctrl.abort();
+  if (outer){ if (outer.aborted) ctrl.abort(); else outer.addEventListener('abort', onAbort, { once: true }); }
+  return { signal: ctrl.signal, timedOut: () => timedOut, done: () => { clearTimeout(t); if (outer) outer.removeEventListener('abort', onAbort); } };
+}
+async function callModel(system, user, { temperature = 0.9, signal, onWait, onTick, timeoutSec = 150 } = {}){
   const cfg = aiConfig();
   if (!cfg.key) throw new ApiError('Sin clave', { fatal: true, userMessage: 'Falta la clave de API (paso 3).' });
   if (!cfg.model) throw new ApiError('Sin modelo', { fatal: true, userMessage: 'Indica el nombre del modelo (paso 3).' });
   for (let attempt = 0; ; attempt++){
+    const ts = timedSignal(signal, timeoutSec * 1000 * (window.__timeoutScale || 1));
+    const t0 = Date.now();
+    const tick = onTick ? setInterval(() => onTick(Math.round((Date.now() - t0) / 1000)), 1000) : null;
     try {
-      return await (cfg.provider === 'gemini' ? callGemini : callOpenAI)(system, user, { temperature, signal });
+      return await (cfg.provider === 'gemini' ? callGemini : callOpenAI)(system, user, { temperature, signal: ts.signal });
     } catch (e) {
+      if (e.name === 'AbortError' && ts.timedOut() && !(signal && signal.aborted))
+        throw new ApiError('Tiempo de espera agotado', { status: 'TIMEOUT', userMessage: `La IA no respondió en ${timeoutSec} s. Prueba con menos encuestados por petición o con un modelo «flash-lite».` });
       if (e.name === 'AbortError') throw e;
       if (e instanceof TypeError) throw new ApiError(e.message, { fatal: true, userMessage: 'No se pudo conectar con el servicio de IA (¿sin conexión o la URL base no admite llamadas desde el navegador?).' });
       if (e.retryable && attempt < 4){
@@ -697,6 +721,8 @@ async function callModel(system, user, { temperature = 0.9, signal, onWait } = {
         continue;
       }
       throw e;
+    } finally {
+      ts.done(); if (tick) clearInterval(tick);
     }
   }
 }
@@ -887,7 +913,8 @@ $('#genBtn').addEventListener('click', async () => {
   $('#nResp').value = n;
   persist();
 
-  let batchSize = clamp(parseInt($('#batch').value, 10) || 8, 1, 20);
+  let batchSize = clamp(parseInt($('#batch').value, 10) || 6, 1, 10);
+  $('#batch').value = batchSize;
   const pause = clamp(parseFloat($('#pause').value) || 0, 0, 120);
   const temperature = (VARIABILITY[$('#variability').value] || VARIABILITY.media).t;
 
@@ -909,7 +936,8 @@ $('#genBtn').addEventListener('click', async () => {
       setProgress(state.results.length, n, `petición ${call}`);
       try {
         const txt = await callModel(GEN_SYSTEM, genPrompt(batch.map(x => x.p)), {
-          temperature, signal,
+          temperature, signal, timeoutSec: 90 + 15 * batch.length,
+          onTick: s => setProgress(state.results.length, n, `petición ${call}: esperando a la IA… ${s} s`),
           onWait: (s, e) => log(`${e.status === 429 ? 'Límite de peticiones' : 'Servicio ocupado'}: espero ${s} s y reintento…`, 'w')
         });
         const data = parseJSON(txt);
@@ -930,9 +958,9 @@ $('#genBtn').addEventListener('click', async () => {
       } catch (e) {
         if (e.name === 'AbortError') throw e;
         if (e.fatal){ log(e.userMessage || e.message, 'e'); break; }
-        if (e.status === 'TRUNC' && batchSize > 1){
+        if ((e.status === 'TRUNC' || e.status === 'TIMEOUT') && batchSize > 1){
           batchSize = Math.max(1, Math.floor(batchSize / 2));
-          log(`La respuesta era demasiado larga; bajo a ${batchSize} encuestados por petición.`, 'w');
+          log(e.status === 'TIMEOUT' ? `La IA tardó demasiado; bajo a ${batchSize} encuestados por petición y reintento.` : `La respuesta era demasiado larga; bajo a ${batchSize} encuestados por petición.`, 'w');
           queue.unshift(...batch); continue;
         }
         if (e.status === 429 || (typeof e.status === 'number' && e.status >= 500)){ log(e.userMessage || e.message, 'e'); queue.unshift(...batch); break; }
